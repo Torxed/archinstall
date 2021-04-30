@@ -32,6 +32,8 @@ for arg in sys.argv[1:]:
 	else:
 		positionals.append(arg)
 
+storage['arguments'] = arguments
+from .lib.plugins import plugins
 
 # TODO: Learn the dark arts of argparse...
 #	   (I summon thee dark spawn of cPython)
