@@ -14,7 +14,8 @@ from .hardware import *
 # Any package that the Installer() is responsible for (optional and the default ones)
 __packages__ = ["base", "base-devel", "linux-firmware", "linux", "linux-lts", "linux-zen", "linux-hardened"]
 
-class Installer():
+
+class Installer:
 	"""
 	`Installer()` is the wrapper for most basic installation steps.
 	It also wraps :py:func:`~archinstall.Installer.pacstrap` among other things.
@@ -38,16 +39,17 @@ class Installer():
 	:type hostname: str, optional
 
 	"""
+
 	def __init__(self, target, *, base_packages=__packages__[:3], kernels=['linux']):
 		self.target = target
 		self.init_time = time.strftime('%Y-%m-%d_%H-%M-%S')
 		self.milliseconds = int(str(time.time()).split('.')[1])
 
 		self.helper_flags = {
-			'base' : False,
-			'bootloader' : False
+			'base': False,
+			'bootloader': False,
 		}
-		
+
 		self.base_packages = base_packages.split(' ') if type(base_packages) is str else base_packages
 		for kernel in kernels:
 			self.base_packages.append(kernel)
@@ -72,7 +74,7 @@ class Installer():
 		# TODO: https://stackoverflow.com/questions/28157929/how-to-safely-handle-an-exception-inside-a-context-manager
 
 		if len(args) >= 2 and args[1]:
-			#self.log(self.trace_log.decode('UTF-8'), level=logging.DEBUG)
+			# self.log(self.trace_log.decode('UTF-8'), level=logging.DEBUG)
 			self.log(args[1], level=logging.ERROR, fg='red')
 
 			self.sync_log_to_install_medium()
@@ -91,13 +93,17 @@ class Installer():
 
 			return True
 		else:
-			self.log('Some required steps were not successfully installed/configured before leaving the installer:', fg='red', level=logging.WARNING)
+			self.log(
+				'Some required steps were not successfully installed/configured before leaving the installer:',
+				fg='red',
+				level=logging.WARNING,
+			)
 			for step in missing_steps:
 				self.log(f' - {step}', fg='red', level=logging.WARNING)
-            
+
 			self.log(f"Detailed error logs can be found at: {storage['LOG_PATH']}", level=logging.WARNING)
 			self.log(f"Submit this zip file as an issue to https://github.com/archlinux/archinstall/issues", level=logging.WARNING)
-               
+
 			self.sync_log_to_install_medium()
 			return False
 
@@ -105,12 +111,12 @@ class Installer():
 		# Copy over the install log (if there is one) to the install medium if
 		# at least the base has been strapped in, otherwise we won't have a filesystem/structure to copy to.
 		if self.helper_flags.get('base-strapped', False) is True:
-			if (filename := storage.get('LOG_FILE', None)):
+			if (filename := storage.get('LOG_FILE', None)) :
 				absolute_logfile = os.path.join(storage.get('LOG_PATH', './'), filename)
 
 				if not os.path.isdir(f"{self.target}/{os.path.dirname(absolute_logfile)}"):
 					os.makedirs(f"{self.target}/{os.path.dirname(absolute_logfile)}")
-				
+
 				shutil.copy2(absolute_logfile, f"{self.target}/{absolute_logfile}")
 
 		return True
@@ -118,14 +124,15 @@ class Installer():
 	def mount(self, partition, mountpoint, create_mountpoint=True):
 		if create_mountpoint and not os.path.isdir(f'{self.target}{mountpoint}'):
 			os.makedirs(f'{self.target}{mountpoint}')
-			
+
 		partition.mount(f'{self.target}{mountpoint}')
 
 	def post_install_check(self, *args, **kwargs):
 		return [step for step, flag in self.helper_flags.items() if flag is False]
 
 	def pacstrap(self, *packages, **kwargs):
-		if type(packages[0]) in (list, tuple): packages = packages[0]
+		if type(packages[0]) in (list, tuple):
+			packages = packages[0]
 		self.log(f'Installing packages: {packages}', level=logging.INFO)
 
 		if (sync_mirrors := sys_command('/usr/bin/pacman -Syy')).exit_code == 0:
@@ -141,7 +148,7 @@ class Installer():
 
 	def genfstab(self, flags='-pU'):
 		self.log(f"Updating {self.target}/etc/fstab", level=logging.INFO)
-		
+
 		fstab = sys_command(f'/usr/bin/genfstab {flags} {self.target}').trace_log
 		with open(f"{self.target}/etc/fstab", 'ab') as fstab_fh:
 			fstab_fh.write(fstab)
@@ -151,12 +158,13 @@ class Installer():
 
 		return True
 
-	def set_hostname(self, hostname :str, *args, **kwargs):
+	def set_hostname(self, hostname: str, *args, **kwargs):
 		with open(f'{self.target}/etc/hostname', 'w') as fh:
 			fh.write(hostname + '\n')
 
 	def set_locale(self, locale, encoding='UTF-8', *args, **kwargs):
-		if not len(locale): return True
+		if not len(locale):
+			return True
 
 		with open(f'{self.target}/etc/locale.gen', 'a') as fh:
 			fh.write(f'{locale}.{encoding} {encoding}\n')
@@ -166,19 +174,17 @@ class Installer():
 		return True if sys_command(f'/usr/bin/arch-chroot {self.target} locale-gen').exit_code == 0 else False
 
 	def set_timezone(self, zone, *args, **kwargs):
-		if not zone: return True
-		if not len(zone): return True # Redundant
+		if not zone:
+			return True
+		if not len(zone):
+			return True  # Redundant
 
-		if (pathlib.Path("/usr")/"share"/"zoneinfo"/zone).exists():
-			(pathlib.Path(self.target)/"etc"/"localtime").unlink(missing_ok=True)
+		if (pathlib.Path("/usr") / "share" / "zoneinfo" / zone).exists():
+			(pathlib.Path(self.target) / "etc" / "localtime").unlink(missing_ok=True)
 			sys_command(f'/usr/bin/arch-chroot {self.target} ln -s /usr/share/zoneinfo/{zone} /etc/localtime')
 			return True
 		else:
-			self.log(
-				f"Time zone {zone} does not exist, continuing with system default.",
-				level=logging.WARNING,
-				fg='red'
-			)
+			self.log(f"Time zone {zone} does not exist, continuing with system default.", level=logging.WARNING, fg='red')
 
 	def activate_ntp(self):
 		self.log(f'Installing and activating NTP.', level=logging.INFO)
@@ -198,7 +204,7 @@ class Installer():
 	def arch_chroot(self, cmd, *args, **kwargs):
 		if 'runas' in kwargs:
 			cmd = f"su - {kwargs['runas']} -c \"{cmd}\""
-			
+
 		return self.run_command(cmd)
 
 	def drop_to_shell(self):
@@ -218,14 +224,14 @@ class Installer():
 				network["DNS"] = dns
 
 			conf = Networkd(Match={"Name": nic}, Network=network)
-		
+
 		with open(f"{self.target}/etc/systemd/network/10-{nic}.network", "a") as netconf:
 			netconf.write(str(conf))
 
 	def copy_ISO_network_config(self, enable_services=False):
 		# Copy (if any) iwd password and config files
 		if os.path.isdir('/var/lib/iwd/'):
-			if (psk_files := glob.glob('/var/lib/iwd/*.psk')):
+			if (psk_files := glob.glob('/var/lib/iwd/*.psk')) :
 				if not os.path.isdir(f"{self.target}/var/lib/iwd"):
 					os.makedirs(f"{self.target}/var/lib/iwd")
 
@@ -250,7 +256,7 @@ class Installer():
 					shutil.copy2(psk, f"{self.target}/var/lib/iwd/{os.path.basename(psk)}")
 
 		# Copy (if any) systemd-networkd config files
-		if (netconfigurations := glob.glob('/etc/systemd/network/*')):
+		if (netconfigurations := glob.glob('/etc/systemd/network/*')) :
 			if not os.path.isdir(f"{self.target}/etc/systemd/network/"):
 				os.makedirs(f"{self.target}/etc/systemd/network/")
 
@@ -260,22 +266,26 @@ class Installer():
 			if enable_services:
 				# If we haven't installed the base yet (function called pre-maturely)
 				if self.helper_flags.get('base', False) is False:
+
 					def post_install_enable_networkd_resolved(*args, **kwargs):
 						self.enable_service('systemd-networkd', 'systemd-resolved')
+
 					self.post_base_install.append(post_install_enable_networkd_resolved)
 				# Otherwise, we can go ahead and enable the services
 				else:
 					self.enable_service('systemd-networkd', 'systemd-resolved')
-					
 
 		return True
 
 	def detect_encryption(self, partition):
 		if partition.encrypted:
 			return partition
-		elif partition.parent not in partition.path and Partition(partition.parent, None, autodetect_filesystem=True).filesystem == 'crypto_LUKS':
+		elif (
+			partition.parent not in partition.path
+			and Partition(partition.parent, None, autodetect_filesystem=True).filesystem == 'crypto_LUKS'
+		):
 			return Partition(partition.parent, None, autodetect_filesystem=True)
-		
+
 		return False
 
 	def minimal_installation(self):
@@ -291,7 +301,7 @@ class Installer():
 
 		for partition in self.partitions:
 			if partition.filesystem == 'btrfs':
-			#if partition.encrypted:
+				# if partition.encrypted:
 				self.base_packages.append('btrfs-progs')
 			if partition.filesystem == 'xfs':
 				self.base_packages.append('xfsprogs')
@@ -309,29 +319,27 @@ class Installer():
 				if 'encrypt' not in HOOKS:
 					HOOKS.insert(HOOKS.index('filesystems'), 'encrypt')
 
-		if not(hasUEFI()): # TODO: Allow for grub even on EFI
+		if not hasUEFI():  # TODO: Allow for grub even on EFI
 			self.base_packages.append('grub')
-										
+
 		self.pacstrap(self.base_packages)
 		self.helper_flags['base-strapped'] = True
-		#self.genfstab()
+		# self.genfstab()
 		if not isVM():
 			vendor = cpuVendor()
-			if vendor ==  "AuthenticAMD":
+			if vendor == "AuthenticAMD":
 				self.base_packages.append("amd-ucode")
 			elif vendor == "GenuineIntel":
 				self.base_packages.append("intel-ucode")
 			else:
 				self.log("Unknown cpu vendor not installing ucode")
 		with open(f"{self.target}/etc/fstab", "a") as fstab:
-			fstab.write(
-				"\ntmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0\n"
-			)  # Redundant \n at the start? who knows?
+			fstab.write("\ntmpfs /tmp tmpfs defaults,noatime,mode=1777 0 0\n")  # Redundant \n at the start? who knows?
 
 		## TODO: Support locale and timezone
-		#os.remove(f'{self.target}/etc/localtime')
-		#sys_command(f'/usr/bin/arch-chroot {self.target} ln -s /usr/share/zoneinfo/{localtime} /etc/localtime')
-		#sys_command('/usr/bin/arch-chroot /mnt hwclock --hctosys --localtime')
+		# os.remove(f'{self.target}/etc/localtime')
+		# sys_command(f'/usr/bin/arch-chroot {self.target} ln -s /usr/share/zoneinfo/{localtime} /etc/localtime')
+		# sys_command('/usr/bin/arch-chroot /mnt hwclock --hctosys --localtime')
 		self.set_hostname('archinstall')
 		self.set_locale('en_US')
 
@@ -358,7 +366,7 @@ class Installer():
 		boot_partition = None
 		root_partition = None
 		for partition in self.partitions:
-			if partition.mountpoint == self.target+'/boot':
+			if partition.mountpoint == f"{self.target}/boot":
 				boot_partition = partition
 			elif partition.mountpoint == self.target:
 				root_partition = partition
@@ -384,9 +392,9 @@ class Installer():
 			else:
 				loader_data = [
 					f"default {self.init_time}",
-					f"timeout 5"
+					f"timeout 5",
 				]
-			
+
 			with open(f'{self.target}/boot/loader/loader.conf', 'w') as loader:
 				for line in loader_data:
 					if line[:8] == 'default ':
@@ -396,7 +404,7 @@ class Installer():
 
 			## For some reason, blkid and /dev/disk/by-uuid are not getting along well.
 			## And blkid is wrong in terms of LUKS.
-			#UUID = sys_command('blkid -s PARTUUID -o value {drive}{partition_2}'.format(**args)).decode('UTF-8').strip()
+			# UUID = sys_command('blkid -s PARTUUID -o value {drive}{partition_2}'.format(**args)).decode('UTF-8').strip()
 			# Setup the loader entry
 			with open(f'{self.target}/boot/loader/entries/{self.init_time}.conf', 'w') as entry:
 				entry.write(f'# Created by: archinstall\n')
@@ -405,7 +413,7 @@ class Installer():
 				entry.write(f'linux /vmlinuz-linux\n')
 				if not isVM():
 					vendor = cpuVendor()
-					if vendor ==  "AuthenticAMD":
+					if vendor == "AuthenticAMD":
 						entry.write("initrd /amd-ucode.img\n")
 					elif vendor == "GenuineIntel":
 						entry.write("initrd /intel-ucode.img\n")
@@ -415,30 +423,43 @@ class Installer():
 				## blkid doesn't trigger on loopback devices really well,
 				## so we'll use the old manual method until we get that sorted out.
 
-
-				if (real_device := self.detect_encryption(root_partition)):
+				if (real_device := self.detect_encryption(root_partition)) :
 					# TODO: We need to detect if the encrypted device is a whole disk encryption,
 					#       or simply a partition encryption. Right now we assume it's a partition (and we always have)
 					log(f"Identifying root partition by PART-UUID on {real_device}: '{real_device.uuid}'.", level=logging.DEBUG)
 					entry.write(f'options cryptdevice=PARTUUID={real_device.uuid}:luksdev root=/dev/mapper/luksdev rw intel_pstate=no_hwp\n')
 				else:
-					log(f"Identifying root partition by PART-UUID on {root_partition}, looking for '{root_partition.uuid}'.", level=logging.DEBUG)
+					log(
+						f"Identifying root partition by PART-UUID on {root_partition}, looking for '{root_partition.uuid}'.", level=logging.DEBUG
+					)
 					entry.write(f'options root=PARTUUID={root_partition.uuid} rw intel_pstate=no_hwp\n')
 
 				self.helper_flags['bootloader'] = bootloader
 				return True
 
-			raise RequirementError(f"Could not identify the UUID of {self.partition}, there for {self.target}/boot/loader/entries/arch.conf will be broken until fixed.")
+			raise RequirementError(
+				f"Could not identify the UUID of {self.partition}, there for {self.target}/boot/loader/entries/arch.conf will be broken until fixed."
+			)
 		elif bootloader == "grub-install":
 			self.pacstrap('grub')
 
 			if hasUEFI():
 				self.pacstrap('efibootmgr')
-				o = b''.join(sys_command(f'/usr/bin/arch-chroot {self.target} grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB'))
+				o = b''.join(
+					sys_command(
+						f'/usr/bin/arch-chroot {self.target} grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=GRUB'
+					)
+				)
 				sys_command('/usr/bin/arch-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg')
 				return True
 			else:
-				root_device = subprocess.check_output(f'basename "$(readlink -f /sys/class/block/{root_partition.path.replace("/dev/","")}/..)"', shell=True).decode().strip()
+				root_device = (
+					subprocess.check_output(
+						f'basename "$(readlink -f /sys/class/block/{root_partition.path.replace("/dev/","")}/..)"', shell=True
+					)
+					.decode()
+					.strip()
+				)
 				if root_device == "block":
 					root_device = f"{root_partition.path}"
 				o = b''.join(sys_command(f'/usr/bin/arch-chroot {self.target} grub-install --target=i386-pc /dev/{root_device}'))
@@ -467,13 +488,13 @@ class Installer():
 		self.log(f'Installing network profile {profile}', level=logging.INFO)
 		return profile.install()
 
-	def enable_sudo(self, entity :str, group=False):
+	def enable_sudo(self, entity: str, group=False):
 		self.log(f'Enabling sudo permissions for {entity}.', level=logging.INFO)
 		with open(f'{self.target}/etc/sudoers', 'a') as sudoers:
 			sudoers.write(f'{"%" if group else ""}{entity} ALL=(ALL) ALL\n')
 		return True
 
-	def user_create(self, user :str, password=None, groups=[], sudo=False):
+	def user_create(self, user: str, password=None, groups=[], sudo=False):
 		self.log(f'Creating user {user}', level=logging.INFO)
 		o = b''.join(sys_command(f'/usr/bin/arch-chroot {self.target} useradd -m -G wheel {user}'))
 		if password:
@@ -495,7 +516,7 @@ class Installer():
 
 		o = b''.join(sys_command(f"/usr/bin/arch-chroot {self.target} sh -c \"echo '{user}:{password}' | chpasswd\""))
 		pass
-						  
+
 	def user_set_shell(self, user, shell):
 		self.log(f'Setting shell for {user} to {shell}', level=logging.INFO)
 
