@@ -9,7 +9,7 @@ if archinstall.arguments.get('help'):
 
 # For support reasons, we'll log the disk layout pre installation to match against post-installation layout
 archinstall.log(f"Disk states before installing: {archinstall.disk_layouts()}", level=archinstall.LOG_LEVELS.Debug)
-
+	
 def ask_user_questions():
 	"""
 	  First, we'll ask the user for a bunch of user input.
@@ -177,8 +177,7 @@ def ask_user_questions():
 	if not archinstall.arguments.get('profile', None):
 		archinstall.arguments['profile'] = archinstall.select_profile(archinstall.list_profiles(filter_top_level_profiles=True))
 	else:
-		archinstall.arguments['profile'] = archinstall.list_profiles()[archinstall.arguments['profile']]
-
+		archinstall.arguments['profile'] = Profile(installer=None, path=archinstall.arguments['profile']['path'])
 	# Check the potentially selected profiles preparations to get early checks if some additional questions are needed.
 	if archinstall.arguments['profile'] and archinstall.arguments['profile'].has_prep_function():
 		with archinstall.arguments['profile'].load_instructions(namespace=f"{archinstall.arguments['profile'].namespace}.py") as imported:
@@ -241,7 +240,8 @@ def perform_installation_steps():
 	archinstall.log(json.dumps(archinstall.arguments, indent=4, sort_keys=True, cls=archinstall.JSON), level=logging.INFO)
 	print()
 
-	input('Press Enter to continue.')
+	if not archinstall.arguments.get('silent'):
+		input('Press Enter to continue.')
 
 	"""
 		Issue a final warning before we continue with something un-revertable.
@@ -259,7 +259,6 @@ def perform_installation_steps():
 		mode = archinstall.GPT
 		if hasUEFI() is False:
 			mode = archinstall.MBR
-
 		with archinstall.Filesystem(archinstall.arguments['harddrive'], mode) as fs:
 			# Wipe the entire drive if the disk flag `keep_partitions`is False.
 			if archinstall.arguments['harddrive'].keep_partitions is False:
@@ -381,15 +380,28 @@ def perform_installation(mountpoint):
 						exit(1)
 
 		installation.log("For post-installation tips, see https://wiki.archlinux.org/index.php/Installation_guide#Post-installation", fg="yellow")
-		choice = input("Would you like to chroot into the newly created installation and perform post-installation configuration? [Y/n] ")
-		if choice.lower() in ("y", ""):
-			try:
-				installation.drop_to_shell()
-			except:
-				pass
+		if not archinstall.arguments.get('silent'):
+			choice = input("Would you like to chroot into the newly created installation and perform post-installation configuration? [Y/n] ")	
+			if choice.lower() in ("y", ""):
+				try:
+					installation.drop_to_shell()
+				except:
+					pass
 
 	# For support reasons, we'll log the disk layout post installation (crash or no crash)
 	archinstall.log(f"Disk states after installing: {archinstall.disk_layouts()}", level=archinstall.LOG_LEVELS.Debug)
 
-ask_user_questions()
+if not archinstall.arguments:
+	ask_user_questions()
+else:
+	# Workarounds if config is loaded from a file
+	# The harddrive section should be moved to perform_installation_steps, where it's actually being performed
+	# Blockdevice object should be created in perform_installation_steps
+	# This needs to be done until then
+	archinstall.arguments['harddrive'] = archinstall.BlockDevice(path=archinstall.arguments['harddrive']['path'])
+	# Temporarily disabling keep_partitions if config file is loaded
+	archinstall.arguments['harddrive'].keep_partitions = False
+	# Temporary workaround to make Desktop Environments work
+	archinstall.storage['_desktop_profile'] = archinstall.arguments.get('desktop', None)
+
 perform_installation_steps()
