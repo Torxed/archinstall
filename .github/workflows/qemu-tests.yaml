@@ -7,7 +7,6 @@ on:
 jobs:
   run-qemu:
     name: qemu testbench
-    if: ${{ github.actor == 'Torxed' }}
     runs-on: self-hosted
     environment: testing
     steps:
