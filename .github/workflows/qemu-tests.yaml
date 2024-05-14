@@ -9,7 +9,7 @@ jobs:
     name: qemu testbench
     runs-on: self-hosted
     environment: testing
-    if: contains( fromJSON('["Torxed"]'), github.actor )
+    if: ${{ contains( fromJSON('["Torxed"]'), github.actor ) }}
     if: ${{ success() }} && ${{ github.ref != 'refs/heads/test-cases' }}
     steps:
       - uses: actions/checkout@v4
