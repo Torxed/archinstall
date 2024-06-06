@@ -37,5 +37,5 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: _build/
           force_orphan: true
-          enable_jekyll: false # This is required to preserve _static (and thus the theme)
+          enable_jekyll: false # This is required to preserve _static (and thus the theme) :D
           cname: archinstall.archlinux.page
